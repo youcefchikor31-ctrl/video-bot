@@ -2,8 +2,8 @@ import os
 import telebot
 import requests
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-AD_LINK = os.environ.get("AD_LINK", "https://link-target.net/5987475/ilbopa4Xyja5")
+BOT_TOKEN = os.environ.get("8981877942:AAHvslByG-QQTnfHjURFRlmD1ygBXRBBe0o")
+AD_LINK = os.environ.get("https://link-target.net/5987475/ilbopa4Xyja5", "https://link-target.net/5987475/ilbopa4Xyja5")
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
