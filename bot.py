@@ -6,7 +6,7 @@ import yt_dlp
 
 # البيانات الخاصة بك
 BOT_TOKEN = "8981877942:AAHvslByG-QQTnfHjURFRlmD1ygBXRBBe0o"
-LINKVERTISE_API_KEY = "https://link-target.net/5987475/ilbopa4Xyja5"
+LINKVERTISE_API_KEY = "https://www.instagram.com/reel/DYvk-W_qD_i/?igsh=MXd3dTliZXozcWpsbw=="
 USER_ID = "5987475"
 
 bot = telebot.TeleBot(BOT_TOKEN)
