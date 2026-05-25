@@ -1,25 +1,34 @@
 import os
 import telebot
-import requests
 
-BOT_TOKEN = os.environ.get("8981877942:AAHvslByG-QQTnfHjURFRlmD1ygBXRBBe0o")
-AD_LINK = os.environ.get("https://link-target.net/5987475/ilbopa4Xyja5", "https://link-target.net/5987475/ilbopa4Xyja5")
+# البيانات الخاصة بك
+BOT_TOKEN = "8981877942:AAHvslByG-QQTnfHjURFRlmD1ygBXRBBe0o"
+AD_LINK = "https://link-target.net/5987475/ilbopa4Xyja5"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.send_message(
-        message.chat.id,
-        f"👋 مرحباً! أرسل لي رابط الفيديو وسأحضره لك.\n\n رابط الإعلان: {AD_LINK}"
+# الترحيب بالروبوت عند إرسال /start
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    welcome_text = (
+        "مرحباً بك في بوت تحميل الفيديوهات! 👋\n\n"
+        "للبدء في استخدام البوت، يرجى دعمنا بزيارة الرابط التالي أولاً:\n"
+        f"🔗 {AD_LINK}\n\n"
+        "بعد زيارة الرابط، أرسل لي رابط الفيديو الذي تريد تحميله هنا."
     )
+    bot.reply_to(message, welcome_text)
 
-@bot.message_handler(func=lambda m: True)
-def handle_message(message):
-    bot.send_message(message.chat.id, "⏳ جاري المعالجة...")
-    bot.send_message(
-        message.chat.id,
-        f"🔗 شاهد الإعلان أولاً ثم احصل على الفيديو:\n{AD_LINK}"
-    )
+# التعامل مع الروابط المرسلة من المستخدم
+@bot.message_handler(func=lambda message: True)
+def handle_messages(message):
+    user_text = message.text
+    if user_text.startswith("http://") or user_text.startswith("https://"):
+        bot.reply_to(message, "جاري معالجة الرابط الخاص بك... الرجاء الانتظار ⏳")
+        # هنا يمكنك مستقبلاً إضافة كود معالجة الفيديوهات وتحميلها
+    else:
+        bot.reply_to(message, "الرجاء إرسال رابط فيديو صحيح يبدأ بـ http أو https.")
 
-bot.infinity_polling()
+# تشغيل البوت المستمر
+if __name__ == "__main__":
+    print("البوت يعمل الآن بنجاح...")
+    bot.infinity_polling()
