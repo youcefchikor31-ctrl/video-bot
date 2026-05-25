@@ -12,7 +12,7 @@ def send_welcome(message):
     welcome_text = (
         "مرحباً بك في بوت تحميل الفيديوهات السريع! 🎬🎶\n\n"
         "أرسل لي أي رابط فيديو (تيك توك، إنستغرام، يوتيوب، إلخ..) "
-        "وسأقوم بسحبه وتحميله لك فوراً بأعلى جودة متوفرة! 🚀"
+        "وسأقوم بسحبه وتحميله لك فوراً بأعلى جودة متوفرة بدون إعلانات! 🚀"
     )
     bot.reply_to(message, welcome_text)
 
@@ -21,48 +21,43 @@ def handle_video_request(message):
     user_id = message.chat.id
     video_url = message.text
     
-    # التحقق من أن النص المرسل هو رابط
     if video_url.startswith("http://") or video_url.startswith("https://"):
-        status_msg = bot.reply_to(message, "جاري سحب الفيديو ومعالجته بأعلى جودة... الرجاء الانتظار ⏳")
+        status_msg = bot.reply_to(message, "جاري سحب الفيديو ومعالجته... الرجاء الانتظار ثواني ⏳")
         
-        # إعدادات yt-dlp لجلب أفضل جودة فيديو وصوت مدمجين تلقائياً
+        # إعدادات معدلة بدقة لتنزيل صيغة مدمجة جاهزة تلقائياً لحل مشكلة ffmpeg
         ydl_opts = {
             'outtmpl': f'video_{user_id}_%(id)s.%(ext)s',
-            'format': 'bestvideo+bestaudio/best',  # جلب أعلى جودة للفيديو والصوت معاً
-            'merge_output_format': 'mp4',          # دمجهم في صيغة mp4 لتعمل على جميع الهواتف
-            'quiet': True
+            'format': 'best[ext=mp4]/best',  # جلب أفضل جودة فيديو تحتوي على صوت وصورة مدمجين مسبقاً
+            'quiet': True,
+            'no_warnings': True
         }
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # استخراج المعلومات والتحميل
                 info = ydl.extract_info(video_url, download=True)
                 filename = ydl.prepare_filename(info)
                 
-                # التأكد من امتداد الملف النهائي بعد الدمج
+                # التأكد من المسار الفعلي للملف المُنزل
                 if not os.path.exists(filename):
                     filename = filename.rsplit('.', 1)[0] + '.mp4'
                 
-                # إرسال الفيديو للمستخدم
+                # إرسال ملف الفيديو للمستخدم مباشرة
                 with open(filename, 'rb') as video_file:
                     bot.send_video(
                         user_id, 
                         video_file, 
-                        caption="✨ تم التحميل بأعلى جودة بواسطة بوتك الحصري!",
+                        caption="✨ تم التحميل بنجاح بواسطة بوت يوسف الحصري!",
                         reply_to_message_id=message.message_id
                     )
                 
-                # حذف الرسالة المؤقتة "جاري المعالجة"
+                # تنظيف وحذف الرسالة المؤقتة والملف
                 bot.delete_message(user_id, status_msg.message_id)
-                
-                # حذف الملف من السيرفر فوراً للحفاظ على المساحة
                 if os.path.exists(filename):
                     os.remove(filename)
                     
         except Exception as e:
-            # في حال حدث خطأ، نعدل الرسالة لتوضيح السبب
             bot.edit_message_text(
-                f"❌ عذراً، فشل تحميل الفيديو.\nقد يكون الرابط غير مدعوم، أو الفيديو خاص/محذوف.\n\nالخطأ: {str(e)[:100]}",
+                f"❌ عذراً، فشل تحميل الفيديو.\nالرابط قد يكون غير مدعوم حالياً أو الفيديو خاص.\n\nالخطأ: {str(e)[:100]}",
                 chat_id=user_id,
                 message_id=status_msg.message_id
             )
@@ -70,5 +65,5 @@ def handle_video_request(message):
         bot.reply_to(message, "الرجاء إرسال رابط فيديو صحيح يبدأ بـ http أو https.")
 
 if __name__ == "__main__":
-    print("البوت المباشر والسريع يعمل الآن بنجاح...")
+    print("البوت السريع والمستقل يعمل الآن بنجاح...")
     bot.infinity_polling()
