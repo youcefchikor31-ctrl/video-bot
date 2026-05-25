@@ -10,7 +10,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     welcome_text = (
-        "مرحباً بك في بوت تحميل الفيديوهات الذكي! 🎬🎶\n\n"
+        "مرحباً بك في بوت تحميل الفيديوهات الذكي والسريع! 🎬🎶\n\n"
         "أرسل لي أي رابط (تيك توك، إنستغرام، يوتيوب، إلخ..) وسأقوم بسحبه فوراً بأعلى جودة متوفرة! 🚀"
     )
     bot.reply_to(message, welcome_text)
@@ -21,28 +21,40 @@ def handle_video_request(message):
     video_url = message.text
     
     if video_url.startswith("http://") or video_url.startswith("https://"):
-        status_msg = bot.reply_to(message, "جاري معالجة الرابط وسحب الملفات... الرجاء الانتظار ⏳")
+        status_msg = bot.reply_to(message, "جاري معالجة الرابط وتخطي جدران الحماية... الرجاء الانتظار ⏳")
         
-        # تحديد إعدادات الفحص بناءً على نوع المنصة
+        # ترويسات وهمية لتخطي حظر إنستغرام وتيك توك (حظر الـ IP)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Sec-Fetch-Mode': 'navigate'
+        }
+        
+        # تحديد الإعدادات حسب نوع المنصة
         if "tiktok.com" in video_url or "instagram.com" in video_url:
-            # تيك توك وإنستغرام يفضل جلب الفيديو مدمجاً مباشرة لتفادي مشاكل الصيغ المنفصلة
             ydl_opts_video = {
                 'outtmpl': f'video_{user_id}_%(id)s.%(ext)s',
                 'format': 'best', 
-                'quiet': True
+                'quiet': True,
+                'no_warnings': True,
+                'http_headers': headers  # حشد الترويسات هنا لتفادي حظر الـ Rate-limit
             }
             ydl_opts_audio = None
         else:
-            # يوتيوب والمنصات الأخرى يتم سحبهم منفصلين لأعلى جودة
             ydl_opts_video = {
                 'outtmpl': f'video_{user_id}_%(id)s.%(ext)s',
                 'format': 'bestvideo',
-                'quiet': True
+                'quiet': True,
+                'no_warnings': True,
+                'http_headers': headers
             }
             ydl_opts_audio = {
                 'outtmpl': f'audio_{user_id}_%(id)s.%(ext)s',
                 'format': 'bestaudio',
-                'quiet': True
+                'quiet': True,
+                'no_warnings': True,
+                'http_headers': headers
             }
         
         try:
@@ -51,7 +63,6 @@ def handle_video_request(message):
                 info_v = ydl_v.extract_info(video_url, download=True)
                 video_file = ydl_v.prepare_filename(info_v)
                 
-                # التأكد من الامتداد في حال اختلف
                 if not os.path.exists(video_file):
                     video_file = video_file.rsplit('.', 1)[0] + '.mp4'
                 
@@ -68,7 +79,7 @@ def handle_video_request(message):
                 if os.path.exists(video_file):
                     os.remove(video_file)
 
-            # 2. تحميل وإرسال الصوت بشكل منفصل (فقط للمنصات التي تدعم ذلك مثل يوتيوب)
+            # 2. تحميل وإرسال الصوت بشكل منفصل (إن وُجد)
             if ydl_opts_audio:
                 with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_a:
                     info_a = ydl_a.extract_info(video_url, download=True)
@@ -89,7 +100,7 @@ def handle_video_request(message):
                     
         except Exception as e:
             bot.edit_message_text(
-                f"❌ عذراً، فشل سحب الملفات.\nالخطأ: {str(e)[:100]}",
+                f"❌ عذراً، فشل سحب الملفات.\nالسبب: حماية المنصة تمنع السيرفر مؤقتاً.\n\nالخطأ: {str(e)[:100]}",
                 chat_id=user_id,
                 message_id=status_msg.message_id
             )
@@ -97,5 +108,5 @@ def handle_video_request(message):
         bot.reply_to(message, "الرجاء إرسال رابط صحيح يبدأ بـ http أو https.")
 
 if __name__ == "__main__":
-    print("البوت الشامل يعمل الآن بنجاح...")
+    print("البوت المحدث المضاد للحظر يعمل الآن...")
     bot.infinity_polling()
