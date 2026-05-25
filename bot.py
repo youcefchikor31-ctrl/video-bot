@@ -11,7 +11,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 def start(message):
     bot.send_message(
         message.chat.id,
-        f"👋 مرحباً! أرسل لي رابط الفيديو وسأحضره لك.\n\n📢 رابط الإعلان: {AD_LINK}"
+        f"👋 مرحباً! أرسل لي رابط الفيديو وسأحضره لك.\n\n رابط الإعلان: {AD_LINK}"
     )
 
 @bot.message_handler(func=lambda m: True)
