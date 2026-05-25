@@ -1,6 +1,6 @@
 import os
-import requests
 import telebot
+import yt_dlp
 
 # التوكن الخاص بك
 BOT_TOKEN = "8981877942:AAHvslByG-QQTnfHjURFRlmD1ygBXRBBe0o"
@@ -10,8 +10,8 @@ bot = telebot.TeleBot(BOT_TOKEN)
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     welcome_text = (
-        "مرحباً بك في بوت تحميل الفيديوهات السريع والمستقر! 🎬🎶\n\n"
-        "أرسل لي أي رابط من تيك توك، إنستغرام، أو يوتيوب وسأقوم بتحميله لك فوراً بأعلى جودة! 🚀"
+        "مرحباً بك في بوت تحميل الفيديوهات الذكي! 🎬🎶\n\n"
+        "أرسل لي أي رابط (تيك توك، إنستغرام، يوتيوب، إلخ..) وسأقوم بسحبه فوراً بأعلى جودة متوفرة! 🚀"
     )
     bot.reply_to(message, welcome_text)
 
@@ -21,48 +21,75 @@ def handle_video_request(message):
     video_url = message.text
     
     if video_url.startswith("http://") or video_url.startswith("https://"):
-        status_msg = bot.reply_to(message, "جاري جلب الفيديو عبر الخادم السريع... الرجاء الانتظار ثواني ⏳")
+        status_msg = bot.reply_to(message, "جاري معالجة الرابط وسحب الملفات... الرجاء الانتظار ⏳")
         
-        # استخدام API خارجي مستقر لتجاوز حظر الـ IP تماماً
-        api_url = f"https://api.dandi.link/api/download?url={video_url}"
+        # تحديد إعدادات الفحص بناءً على نوع المنصة
+        if "tiktok.com" in video_url or "instagram.com" in video_url:
+            # تيك توك وإنستغرام يفضل جلب الفيديو مدمجاً مباشرة لتفادي مشاكل الصيغ المنفصلة
+            ydl_opts_video = {
+                'outtmpl': f'video_{user_id}_%(id)s.%(ext)s',
+                'format': 'best', 
+                'quiet': True
+            }
+            ydl_opts_audio = None
+        else:
+            # يوتيوب والمنصات الأخرى يتم سحبهم منفصلين لأعلى جودة
+            ydl_opts_video = {
+                'outtmpl': f'video_{user_id}_%(id)s.%(ext)s',
+                'format': 'bestvideo',
+                'quiet': True
+            }
+            ydl_opts_audio = {
+                'outtmpl': f'audio_{user_id}_%(id)s.%(ext)s',
+                'format': 'bestaudio',
+                'quiet': True
+            }
         
         try:
-            response = requests.get(api_url, timeout=20)
-            
-            if response.status_code == 200:
-                data = response.json()
+            # 1. تحميل وإرسال الفيديو
+            with yt_dlp.YoutubeDL(ydl_opts_video) as ydl_v:
+                info_v = ydl_v.extract_info(video_url, download=True)
+                video_file = ydl_v.prepare_filename(info_v)
                 
-                # التحقق من نجاح العملية وجود الرابط المباشر للملف
-                if data.get("status") and "download_url" in data:
-                    direct_download_url = data["download_url"]
-                    title = data.get("title", "تم التحميل بنجاح ✨")
-                    
-                    # إرسال الفيديو للمستخدم مباشرة عبر الرابط دون الحاجة لتحميله على السيرفر الخاص بك أولاً
+                # التأكد من الامتداد في حال اختلف
+                if not os.path.exists(video_file):
+                    video_file = video_file.rsplit('.', 1)[0] + '.mp4'
+                
+                caption_text = "🎬 فيديو بجودة عالية مدمج الصوت" if ydl_opts_audio is None else "🎬 فيديو بأعلى جودة (بدون صوت)"
+                
+                with open(video_file, 'rb') as vf:
                     bot.send_video(
                         user_id, 
-                        direct_download_url, 
-                        caption=f"🎬 {title}\n\nبواسطة بوتك الحصري!",
+                        vf, 
+                        caption=caption_text,
                         reply_to_message_id=message.message_id
                     )
-                    
-                    # حذف رسالة الانتظار
-                    bot.delete_message(user_id, status_msg.message_id)
-                else:
-                    bot.edit_message_text(
-                        "❌ عذراً، لم نتمكن من العثور على ملف الفيديو في هذا الرابط. تأكد من أن الحساب ليس خاصاً.",
-                        chat_id=user_id,
-                        message_id=status_msg.message_id
-                    )
-            else:
-                bot.edit_message_text(
-                    "❌ الخادم يواجه ضغطاً حالياً، يرجى المحاولة مرة أخرى بعد قليل.",
-                    chat_id=user_id,
-                    message_id=status_msg.message_id
-                )
                 
+                if os.path.exists(video_file):
+                    os.remove(video_file)
+
+            # 2. تحميل وإرسال الصوت بشكل منفصل (فقط للمنصات التي تدعم ذلك مثل يوتيوب)
+            if ydl_opts_audio:
+                with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_a:
+                    info_a = ydl_a.extract_info(video_url, download=True)
+                    audio_file = ydl_a.prepare_filename(info_a)
+                    
+                    with open(audio_file, 'rb') as af:
+                        bot.send_audio(
+                            user_id, 
+                            af, 
+                            caption="🎵 الملف الصوتي الخاص بالفيديو بجودة كاملة"
+                        )
+                    
+                    if os.path.exists(audio_file):
+                        os.remove(audio_file)
+            
+            # حذف رسالة الانتظار
+            bot.delete_message(user_id, status_msg.message_id)
+                    
         except Exception as e:
             bot.edit_message_text(
-                f"❌ حدث خطأ أثناء معالجة الرابط.\nالرجاء المحاولة لاحقاً.",
+                f"❌ عذراً، فشل سحب الملفات.\nالخطأ: {str(e)[:100]}",
                 chat_id=user_id,
                 message_id=status_msg.message_id
             )
@@ -70,5 +97,5 @@ def handle_video_request(message):
         bot.reply_to(message, "الرجاء إرسال رابط صحيح يبدأ بـ http أو https.")
 
 if __name__ == "__main__":
-    print("البوت السحابي المستقر يعمل الآن بنجاح...")
+    print("البوت الشامل يعمل الآن بنجاح...")
     bot.infinity_polling()
