@@ -10,9 +10,8 @@ bot = telebot.TeleBot(BOT_TOKEN)
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     welcome_text = (
-        "مرحباً بك في بوت تحميل الفيديوهات والصوتيات المنفصلة! 🎬🎶\n\n"
-        "أرسل لي أي رابط فيديو (تيك توك، إنستغرام، يوتيوب، إلخ..) "
-        "وسأقوم بتحميل الفيديو بأعلى جودة متوفرة، ومعه ملف الصوت منفصلاً فوراً! 🚀"
+        "مرحباً بك في بوت تحميل الفيديوهات الذكي! 🎬🎶\n\n"
+        "أرسل لي أي رابط (تيك توك، إنستغرام، يوتيوب، إلخ..) وسأقوم بسحبه فوراً بأعلى جودة متوفرة! 🚀"
     )
     bot.reply_to(message, welcome_text)
 
@@ -22,20 +21,29 @@ def handle_video_request(message):
     video_url = message.text
     
     if video_url.startswith("http://") or video_url.startswith("https://"):
-        status_msg = bot.reply_to(message, "جاري سحب الفيديو والصوت بأعلى جودة منفصلة... الرجاء الانتظار ⏳")
+        status_msg = bot.reply_to(message, "جاري معالجة الرابط وسحب الملفات... الرجاء الانتظار ⏳")
         
-        # إعدادات تنزيل الفيديو والصوت كملفين منفصلين لتفادي الحاجة لـ ffmpeg
-        ydl_opts_video = {
-            'outtmpl': f'video_{user_id}_%(id)s.%(ext)s',
-            'format': 'bestvideo',  # جلب أعلى جودة فيديو متوفرة فقط (بدون صوت)
-            'quiet': True
-        }
-        
-        ydl_opts_audio = {
-            'outtmpl': f'audio_{user_id}_%(id)s.%(ext)s',
-            'format': 'bestaudio',  # جلب أعلى جودة صوت متوفرة فقط
-            'quiet': True
-        }
+        # تحديد إعدادات الفحص بناءً على نوع المنصة
+        if "tiktok.com" in video_url or "instagram.com" in video_url:
+            # تيك توك وإنستغرام يفضل جلب الفيديو مدمجاً مباشرة لتفادي مشاكل الصيغ المنفصلة
+            ydl_opts_video = {
+                'outtmpl': f'video_{user_id}_%(id)s.%(ext)s',
+                'format': 'best', 
+                'quiet': True
+            }
+            ydl_opts_audio = None
+        else:
+            # يوتيوب والمنصات الأخرى يتم سحبهم منفصلين لأعلى جودة
+            ydl_opts_video = {
+                'outtmpl': f'video_{user_id}_%(id)s.%(ext)s',
+                'format': 'bestvideo',
+                'quiet': True
+            }
+            ydl_opts_audio = {
+                'outtmpl': f'audio_{user_id}_%(id)s.%(ext)s',
+                'format': 'bestaudio',
+                'quiet': True
+            }
         
         try:
             # 1. تحميل وإرسال الفيديو
@@ -43,33 +51,40 @@ def handle_video_request(message):
                 info_v = ydl_v.extract_info(video_url, download=True)
                 video_file = ydl_v.prepare_filename(info_v)
                 
+                # التأكد من الامتداد في حال اختلف
+                if not os.path.exists(video_file):
+                    video_file = video_file.rsplit('.', 1)[0] + '.mp4'
+                
+                caption_text = "🎬 فيديو بجودة عالية مدمج الصوت" if ydl_opts_audio is None else "🎬 فيديو بأعلى جودة (بدون صوت)"
+                
                 with open(video_file, 'rb') as vf:
                     bot.send_video(
                         user_id, 
                         vf, 
-                        caption="🎬 فيديو بأعلى جودة (بدون صوت)",
+                        caption=caption_text,
                         reply_to_message_id=message.message_id
                     )
                 
                 if os.path.exists(video_file):
                     os.remove(video_file)
 
-            # 2. تحميل وإرسال الصوت
-            with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_a:
-                info_a = ydl_a.extract_info(video_url, download=True)
-                audio_file = ydl_a.prepare_filename(info_a)
-                
-                with open(audio_file, 'rb') as af:
-                    bot.send_audio(
-                        user_id, 
-                        af, 
-                        caption="🎵 الملف الصوتي الخاص بالفيديو بأعلى دقة"
-                    )
-                
-                if os.path.exists(audio_file):
-                    os.remove(audio_file)
+            # 2. تحميل وإرسال الصوت بشكل منفصل (فقط للمنصات التي تدعم ذلك مثل يوتيوب)
+            if ydl_opts_audio:
+                with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_a:
+                    info_a = ydl_a.extract_info(video_url, download=True)
+                    audio_file = ydl_a.prepare_filename(info_a)
+                    
+                    with open(audio_file, 'rb') as af:
+                        bot.send_audio(
+                            user_id, 
+                            af, 
+                            caption="🎵 الملف الصوتي الخاص بالفيديو بجودة كاملة"
+                        )
+                    
+                    if os.path.exists(audio_file):
+                        os.remove(audio_file)
             
-            # حذف رسالة الانتظار بعد إرسال الملفين بنجاح
+            # حذف رسالة الانتظار
             bot.delete_message(user_id, status_msg.message_id)
                     
         except Exception as e:
@@ -79,8 +94,8 @@ def handle_video_request(message):
                 message_id=status_msg.message_id
             )
     else:
-        bot.reply_to(message, "الرجاء إرسال رابط فيديو صحيح يبدأ بـ http أو https.")
+        bot.reply_to(message, "الرجاء إرسال رابط صحيح يبدأ بـ http أو https.")
 
 if __name__ == "__main__":
-    print("بوت التحميل المنفصل يعمل الآن بنجاح وبأعلى جودة...")
+    print("البوت الشامل يعمل الآن بنجاح...")
     bot.infinity_polling()
